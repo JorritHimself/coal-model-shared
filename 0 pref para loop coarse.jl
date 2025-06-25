@@ -106,10 +106,11 @@ flowslist = crossjoin(edgelist, coaltypelist, makeunique = true)
 flowslist = leftjoin(flowslist, edge_data, on = [:orig_node_id, :dest_node_id]) 
 # list of resources that can be supplied by any node. Includes all nodes*resource types, with mostly zeroes. Need thisfor constraint mass flow balance #2 [origin, resource_subtype]
 supplylist = crossjoin(nodelist, coaltypelist, makeunique = true)
-df_node_data = select(df_supply, [:node_id, :coal_group, :prod_capa_Mt, :total_gate_cost_usd_pt])
+df_node_data = select(df_supply, [:node_id, :coal_group, :prod_capa_Mt, :total_gate_cost_usd_pt, :overhead_cost_usd_pt])
 df_node_data = leftjoin(supplylist, df_node_data, on = [:node_id, :coal_group]) 
 replace!(df_node_data.prod_capa_Mt, missing => 0)
 replace!(df_node_data.total_gate_cost_usd_pt, missing => 0)
+replace!(df_node_data.overhead_cost_usd_pt, missing => 0)
 # add port and steelplant node capacities
 df_port_capa = select(df_port_capa, [:node_id, :port_cap_Mt])
 df_node_data = leftjoin(df_node_data, df_port_capa, on = [:node_id]) 
@@ -166,6 +167,11 @@ replace!(flowslist.pref_para, missing => 0)
 # Supply also must be >0 (prevents model suggesting negative supply at negative costs)
 df_node_data.supply_item_mass_by_node = @variable(cn_coal_model, s[1:size(df_node_data, 1)] >= 0)
 set_upper_bound.(df_node_data.supply_item_mass_by_node, df_node_data.prod_capa_Mt)
+# create a binary variable that is 1 if there is any supply from a node, otherwise zero. Will be multiplied by fixed cost parameter for each mine
+df_node_data.binary_supply = @variable(cn_coal_model, s[1:size(df_node_data, 1)], Bin)
+
+# Create a constraint such that node supply has to be greater than the binary of supply being 0 for no supply and 1 for any supply
+@constraint(model, df_node_data.supply_item_mass_by_node >= df_node_data.binary_supply)
 # join coal type data
 df_node_data = DataFrames.leftjoin(
     df_node_data,
@@ -486,7 +492,7 @@ df_mng_chn_imp_cap = DataFrames.crossjoin(df_mng_chn_imp_cap, df_chn_mng_imports
 @objective(
     cn_coal_model,
     Min,
-    sum(r.total_gate_cost_usd_pt * r.supply_item_mass_by_node * 1e6 for r in eachrow(df_node_data)) +
+    sum(((r.total_gate_cost_usd_pt-r.overhead_cost_usd_pt) * r.supply_item_mass_by_node + r.overhead_cost_usd_pt * r.prod_capa_Mt * r.binary_supply) * 1e6 for r in eachrow(df_node_data)) +
     sum(r.transp_cost_tot_usd * r.mf  * 1e6 for r in eachrow(flowslist)) + 
     sum(r.pref_para * r.mf  * 1e6 for r in eachrow(flowslist)) + 
     sum(r.transm_cost_usd_GJ * 1e6 * r.mf  * 1e6 * r.CV_PJ_p_Mt_therm for r in eachrow(flowslist))
