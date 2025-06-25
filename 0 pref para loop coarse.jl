@@ -1,4 +1,3 @@
-
 ###########################################    START preamble: packages and paths ###############################
 ###    reading in of file also done in this section, this differs for local or cloud computing applications
 # Packages
@@ -20,11 +19,8 @@ if isdir("C:/Users/jorri/OneDrive/Work") # basepath at home
 elseif isdir("D:/OneDrive/Work") # basepath at work
     basepath = "D:/OneDrive/Work"
 end
-scenario = "calib"
-inputdatapath = "China Coal Import Markets Project -- SHARED/Data/Build v22 "
-inputdatapath = string(inputdatapath, scenario) 
+inputdatapath = "China Coal Import Markets Project -- SHARED/Data/coal-model-shared"
 inputdatapath = joinpath(basepath, inputdatapath)
-outputpath = "sol pref para"
 outputpath = joinpath(basepath, inputdatapath)
 soloutputpath = joinpath(outputpath, "solutions")
 thprefparaoutputpath = joinpath(outputpath, "pref para th")
@@ -168,10 +164,10 @@ replace!(flowslist.pref_para, missing => 0)
 df_node_data.supply_item_mass_by_node = @variable(cn_coal_model, s[1:size(df_node_data, 1)] >= 0)
 set_upper_bound.(df_node_data.supply_item_mass_by_node, df_node_data.prod_capa_Mt)
 # create a binary variable that is 1 if there is any supply from a node, otherwise zero. Will be multiplied by fixed cost parameter for each mine
-df_node_data.binary_supply = @variable(cn_coal_model, s[1:size(df_node_data, 1)], Bin)
+df_node_data.binary_supply = @variable(cn_coal_model, b[1:size(df_node_data, 1)], Bin)
 
 # Create a constraint such that node supply has to be greater than the binary of supply being 0 for no supply and 1 for any supply
-@constraint(model, df_node_data.supply_item_mass_by_node >= df_node_data.binary_supply)
+@constraint(cn_coal_model, df_node_data.supply_item_mass_by_node >= df_node_data.binary_supply)
 # join coal type data
 df_node_data = DataFrames.leftjoin(
     df_node_data,
