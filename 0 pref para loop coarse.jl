@@ -134,8 +134,8 @@ end
 # time stamp: start build    
 start_build_time = now()
 # Problem and solver definition
-cn_coal_model = Model(CPLEX.Optimizer)
-#cn_coal_model = Model(HiGHS.Optimizer)
+#cn_coal_model = Model(CPLEX.Optimizer)
+cn_coal_model = Model(HiGHS.Optimizer)
 
 # Problem variables
 # Flows are defined as non-negative. This is needed to prevent unidirectional edges transporting goods both ways, and to have negative flows lead to negative tarnsport costs
